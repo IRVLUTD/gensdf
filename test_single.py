@@ -83,7 +83,7 @@ def main():
     if file_ext == ".csv":
         f = pd.read_csv(args.file, sep=',',header=None).values
         # only use points on the object surface
-        f = f[f[:,-1]==0][:,:3]
+        # f = f[f[:,-1]==0][:,:3]
     elif file_ext == ".ply":
         f = trimesh.load(args.file).vertices
     else:
@@ -91,10 +91,10 @@ def main():
         exit()
 
     # visualization
-    # visualization(color, depth, pc[::5], f[::20])
+    print(pc.shape, f.shape)
+    visualization(color, depth, pc[::5], f[::20])
     
     # assign poinsts
-    print(pc.shape, f.shape)
     f = pc.copy()
 
     sampled_points = 15000 # load more points for more accurate reconstruction 

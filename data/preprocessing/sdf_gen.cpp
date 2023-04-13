@@ -75,9 +75,9 @@ int main(int argc, char * argv[])
   std::cout << "Normalizing the input mesh...\n";
   normalize_mesh_bbox(mesh_v);
 
-  int num_samples = 500000;
-  int num_samples_from_surface = (int)(47 * num_samples / 100);
-  int num_samples_near_surface = num_samples - num_samples_from_surface;
+  int num_samples = 200000;
+  int num_samples_from_surface = (int)(47 * num_samples / 100) / 2;
+  int num_samples_near_surface = num_samples - num_samples_from_surface * 2;
 
   std::cout << "Sampling points...\n";
   Eigen::MatrixXd B, pc; // B: barycentric coord, pc: point cloud
@@ -93,11 +93,16 @@ int main(int argc, char * argv[])
   std::normal_distribution<float> perturb_norm2(0, sqrt(second_variance));
 
   std::cout << "Sampling query points...\n";
-  Eigen::MatrixXd query_points(num_samples_from_surface * 2, 3); // query points
+  Eigen::MatrixXd query_points(num_samples_from_surface * 2 + num_samples_near_surface, 3); // query points
   for(int i = 0; i <num_samples_from_surface; i++)
   {
     query_points.row(i) = pc.row(i) + perturb_norm1(rng) * pc.row(i); // first query
     query_points.row(num_samples_from_surface+i) = pc.row(i) + perturb_norm2(rng) * pc.row(i); // second query
+  }
+  
+  for(int i = 0; i <num_samples_near_surface; i++)
+  {
+    query_points.row(num_samples_from_surface * 2 + i) = 0.5 * Eigen::MatrixXd::Random(1, 3);
   }
 
   std::cout << "Computing signed distances...\n";

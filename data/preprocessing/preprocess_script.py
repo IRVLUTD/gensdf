@@ -57,6 +57,8 @@ def run_sdf_gen(root_dir, class_name):
         args = ("build/sdf_gen",  os.path.join(mesh_folder, "model.obj"), mesh_folder, "|| true")
         popen = subprocess.Popen(args, stderr=subprocess.DEVNULL)
         popen.wait()
+        
+        # sys.exit(1)
 
     # after all csv gt files created, remove those without negative sdv 
     for mesh in mesh_folders:
