@@ -11,9 +11,11 @@
 
 void recenter_mesh(
   Eigen::MatrixXd & V,
-  Eigen::MatrixXi & F)
+  Eigen::MatrixXi & F,
+  Eigen::RowVector3d & C
+  )
 {
-  Eigen::RowVector3d C; // centroid of V
+  // Eigen::RowVector3d C; // centroid of V
   igl::centroid(V,F,C);
   V.rowwise() -= C;
 }
@@ -49,6 +51,15 @@ void write_matrix_to_csv(
   file << T.format(CSVFormat);
 }
 
+
+void write_vector_to_csv(
+  const std::string & filename,
+  Eigen::RowVector3d & T)
+{
+  std::ofstream file(filename.c_str());
+  file << T.format(CSVFormat);
+}
+
 int main(int argc, char * argv[])
 {
   std::cout << "Reading the input mesh...\n";
@@ -58,7 +69,8 @@ int main(int argc, char * argv[])
   igl::read_triangle_mesh(mesh_file, mesh_v, mesh_f);
 
   std::cout << "Recentering the input mesh...\n";
-  recenter_mesh(mesh_v, mesh_f);
+  Eigen::RowVector3d centroid;
+  recenter_mesh(mesh_v, mesh_f, centroid);
 
   std::cout << "Normalizing the input mesh...\n";
   normalize_mesh_bbox(mesh_v);
@@ -113,6 +125,10 @@ int main(int argc, char * argv[])
   std::string sdf_file = save_data_dir + "/sdf_data.csv";
   std::cout << sdf_file << std::endl;
   write_matrix_to_csv(sdf_file, SDFData);
+  
+  std::string centroid_file = save_data_dir + "/centroid.csv";
+  std::cout << centroid_file << std::endl;
+  write_vector_to_csv(centroid_file, centroid);  
 
   return 0;
 }

@@ -17,10 +17,61 @@ from tqdm import tqdm
 # remember to add paths in model/__init__.py for new models
 from model import *
 
+from renderer.online_object_renderer import OnlineObjectRenderer
+from utils import utils
+
+
+
+def visualization(color, depth, pc, pc2):
+
+    # visualization for your debugging
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+        
+    # show RGB image
+    ax = fig.add_subplot(1, 3, 1)
+    plt.imshow(color[:, :, (2, 1, 0)])
+    ax.set_title('RGB image')
+        
+    # show depth image
+    ax = fig.add_subplot(1, 3, 2)
+    plt.imshow(depth)
+    ax.set_title('depth image')
+        
+    # up to now, suppose you get the points box as pbox. Its shape should be (5280, 3)
+    # then you can use the following code to visualize the points in pbox
+    # You shall see the figure in the homework assignment
+    ax = fig.add_subplot(1, 3, 3, projection='3d')
+    ax.scatter(pc[:, 0], pc[:, 1], pc[:, 2], marker='.', color='r')
+    ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], marker='.', color='g')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('3D ploud cloud')
+                  
+    plt.show()
 
 
 def main():
+
+    # set up renderer
+    renderer = OnlineObjectRenderer(caching=True)
+    all_poses = utils.uniform_quaternions()
     
+    cad_path = args.file.replace('sdf_data.csv', 'model.obj')
+    cad_scale = 1.0
+    
+    viewing_index = np.random.randint(0, high=len(all_poses))
+    camera_pose = all_poses[viewing_index]
+    
+    # read centroid
+    filename = args.file.replace('sdf_data', 'centroid')
+    centroid = pd.read_csv(filename, sep=',',header=None).values
+    
+    color, depth, pc, transferred_pose = renderer.change_and_render(cad_path, cad_scale, centroid, camera_pose)
+    pc = pc.dot(utils.inverse_transform(transferred_pose).T)[:, :3]
+    
+    # set up model
     model = init_model(specs["Model"], specs, 1)
     
     ckpt = "{}.ckpt".format(args.resume) if args.resume=='last' else "epoch={}.ckpt".format(args.resume)
@@ -31,6 +82,7 @@ def main():
     file_ext = args.file[-4:]
     if file_ext == ".csv":
         f = pd.read_csv(args.file, sep=',',header=None).values
+        # only use points on the object surface
         f = f[f[:,-1]==0][:,:3]
     elif file_ext == ".ply":
         f = trimesh.load(args.file).vertices
@@ -38,6 +90,12 @@ def main():
         print("add your extension type here! currently not supported...")
         exit()
 
+    # visualization
+    # visualization(color, depth, pc[::5], f[::20])
+    
+    # assign poinsts
+    print(pc.shape, f.shape)
+    f = pc.copy()
 
     sampled_points = 15000 # load more points for more accurate reconstruction 
     
