@@ -66,58 +66,27 @@ class GenSDF(base_pl.Model):
  
     # context and queries from labeled, unlabeled data, respectively 
     def training_step(self, x, batch_idx):
-
-        context = x['context']
-        query = x['query']
         
-        context_pc = context['point_cloud']
-        context_xyz = context['sdf_xyz']
-        context_gt = context['gt_sdf']
-
-        query_pc = query['point_cloud']
-        query_xyz = query['sdf_xyz']
-        #query_gt_sdf = query['gt_sdf'] # pseudo unlabeled for this experiment
-        query_gt_pt = query['gt_pt']
+        context_pc = x['point_cloud']
+        context_xyz = x['sdf_xyz']
+        context_gt = x['gt_sdf']
 
         #print("context xyz, pc shape: ", context_xyz.shape, context_pc.shape)
-        #print("query xyz, pc shape: ",query_xyz.shape, query_pc.shape)
 
         lab_shape_vecs = self.encoder(context_pc, context_xyz)
         #lab_enc_xyz = self.ff_enc(context_xyz, self.avals.to(self.device), self.bvals.to(self.device))
         lab_decoder_input = torch.cat([lab_shape_vecs, context_xyz], dim=-1)
         lab_pred_sdf = self.decoder(lab_decoder_input)
-        
-        unlab_input = torch.cat([query_xyz, query_pc], dim=1)
-        shape_vecs = self.encoder(query_pc, unlab_input)
-        #enc_xyz = self.ff_enc(unlab_input, self.avals.to(self.device), self.bvals.to(self.device))
-        decoder_input = torch.cat([shape_vecs, unlab_input], dim=-1)
-        pred_sdf = self.decoder(decoder_input).unsqueeze(-1)
-        pc_pred = pred_sdf[:,query_xyz.shape[1]:]
-        pred_sdf = pred_sdf[:,:query_xyz.shape[1]]
-
-        
-        #print("unlab input shape: ",unlab_input.shape)
-        #print("pc_pred, pred sdf shape: ",pc_pred.shape, pred_sdf.shape)
-
-        pred_pt, query_gt_pt = self.get_unlab_offset(query_xyz, query_gt_pt, pred_sdf)
-
-        # loss of pt offset and loss of L1
-        unlabeled_loss = self.unlabeled_loss(pred_pt, query_gt_pt)
-        #query_l1 = nn.L1Loss()(pred_sdf.squeeze(), query_gt_sdf.squeeze()).detach()
-        # using pc to supervise query as well
-        pc_l1 = nn.L1Loss()(pc_pred, torch.zeros_like(pc_pred))
 
         # labeled (supervised) loss
         labeled_l1 = self.labeled_loss(lab_pred_sdf, context_gt)
 
         loss_dict =  {
-                        "unlab": unlabeled_loss,
                         "lab": labeled_l1,
-                        "unlab_pc": pc_l1
                     }
         self.log_dict(loss_dict, prog_bar=True, enable_graph=False)
         
-        return pc_l1*0.01*self.alpha + unlabeled_loss*self.alpha + labeled_l1
+        return labeled_l1
         
         
 
@@ -128,46 +97,6 @@ class GenSDF(base_pl.Model):
             
         return l1_loss 
 
-    def unlabeled_loss(self, pred_pt, gt_pt):
-        
-        return nn.MSELoss()(pred_pt, gt_pt)
-
-
-    def get_unlab_offset(self, query_xyz, query_gt_pt, pred_sdf):
-        dir_vec = F.normalize(query_xyz - query_gt_pt, dim=-1)
-
-        # different for batch size=1 and batch_size >1
-        # TODO: combine, shouldn't need this condition
-        if query_xyz.shape[0] ==1:
-            pred_sdf = pred_sdf.unsqueeze(0)
-            neg_idx = torch.where(pred_sdf.squeeze()<0)[0]
-            pos_idx = torch.where(pred_sdf.squeeze()>=0)[0]
-
-            neg_pred = query_xyz[:,neg_idx] + dir_vec[:, neg_idx] * pred_sdf[:,neg_idx]
-            pos_pred = query_xyz[:,pos_idx] - dir_vec[:, pos_idx] * pred_sdf[:,pos_idx]
-
-            pred_pt = torch.cat((neg_pred, pos_pred), dim=1)                                                                  
-            query_gt_pt = torch.cat((query_gt_pt[:,neg_idx], query_gt_pt[:,pos_idx]), dim=1)
-        
-        else:
-            # splits into a tuple of two tensors; one tensor for each dimension; then can use as index
-            neg_idx = pred_sdf.squeeze()<0
-            neg_idx = neg_idx.nonzero().split(1, dim=1) 
-
-            pos_idx = pred_sdf.squeeze()>=0
-            pos_idx = pos_idx.nonzero().split(1, dim=1)
-
-            # based on sign of sdf value, need to direct in different direction
-            # indexing in this way results in an extra dimension that should be squeezed
-            neg_pred = query_xyz[neg_idx].squeeze(1) + dir_vec[neg_idx].squeeze(1) * pred_sdf[neg_idx].squeeze(1)
-            pos_pred = query_xyz[pos_idx].squeeze(1) - dir_vec[pos_idx].squeeze(1) * pred_sdf[pos_idx].squeeze(1)
-
-            # for batch size 4, query_per_batch 16384, 
-            # dimension 4,16384,3 -> 4*16384, 3
-            pred_pt = torch.cat((neg_pred, pos_pred), dim=0) # batches are combined
-            query_gt_pt = torch.cat((query_gt_pt[neg_idx].squeeze(1), query_gt_pt[pos_idx].squeeze(1)), dim=0)
-
-        return pred_pt, query_gt_pt
 
     # two dataloaders for semi-supervised stage; only one for meta-learning stage
     def train_dataloader(self):
@@ -297,8 +226,3 @@ class GenSDF(base_pl.Model):
         _, min_idx = torch.min(dists, dim=-1)  
         gt_pt = pc[min_idx]
         return xyz.unsqueeze(0), gt_pt.unsqueeze(0)
-
-
-
-    
-
