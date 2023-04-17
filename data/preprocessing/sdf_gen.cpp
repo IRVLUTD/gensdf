@@ -102,7 +102,7 @@ int main(int argc, char * argv[])
   
   for(int i = 0; i <num_samples_near_surface; i++)
   {
-    query_points.row(num_samples_from_surface * 2 + i) = 0.5 * Eigen::MatrixXd::Random(1, 3);
+    query_points.row(num_samples_from_surface * 2 + i) = Eigen::MatrixXd::Random(1, 3);
   }
 
   std::cout << "Computing signed distances...\n";

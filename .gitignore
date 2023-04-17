@@ -1,5 +1,8 @@
 *.obj
 *.ply
+*.ckpt
+*.csv
+*log*
 */.DS_Store
 
 # Byte-compiled / optimized / DLL files

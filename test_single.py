@@ -83,7 +83,7 @@ def main():
     if file_ext == ".csv":
         f = pd.read_csv(args.file, sep=',',header=None).values
         # only use points on the object surface
-        # f = f[f[:,-1]==0][:,:3]
+        f = f[f[:,-1]==0][:,:3]
     elif file_ext == ".ply":
         f = trimesh.load(args.file).vertices
     else:
@@ -106,7 +106,7 @@ def main():
 
     f = torch.from_numpy(f)[torch.randperm(f.shape[0])[0:sampled_points]].float().unsqueeze(0)
     model.load_state_dict(checkpoint['state_dict'])
-    model.reconstruct(model, {'point_cloud':f, 'mesh_name':"loaded_file"}, eval_dir="single_recon", testopt=True, sampled_points=sampled_points) 
+    model.reconstruct(model, {'point_cloud':f, 'mesh_name':"loaded_file"}, eval_dir="single_recon", testopt=False, sampled_points=sampled_points) 
 
 
 def init_model(model, specs, num_objects):
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument(
         "--exp_dir", "-e",
-        default="config/gensdf/semi",
+        default="config/partial_gensdf",
         help="This directory should include experiment specifications in 'specs.json,' and logging will be done in this directory as well.",
     )
     arg_parser.add_argument(

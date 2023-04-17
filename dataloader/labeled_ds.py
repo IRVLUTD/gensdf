@@ -11,6 +11,9 @@ from . import base
 import pandas as pd 
 import csv
 
+from renderer.online_object_renderer import OnlineObjectRenderer
+from utils import utils
+
 class LabeledDS(base.Dataset):
 
     def __init__(
@@ -24,6 +27,10 @@ class LabeledDS(base.Dataset):
         self.samples_per_mesh = samples_per_mesh
         self.pc_size = pc_size
         self.gt_files = self.get_instance_filenames(data_source, split_file)
+        
+        # initialize the renderer
+        self.renderer = OnlineObjectRenderer(caching=True)
+        self.all_poses = utils.uniform_quaternions()         
 
     def __getitem__(self, idx): 
         

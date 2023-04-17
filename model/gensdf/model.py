@@ -145,33 +145,16 @@ class GenSDF(base_pl.Model):
     def fast_opt(self, model, full_pc, num_iterations=800):
 
         num_iterations = num_iterations
-        xyz_full, gt_pt_full = self.fast_preprocess(full_pc)
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
         print("performing refinement on input point cloud...")
         #print("shapes: ", full_pc.shape, xyz_full.shape)
         for e in range(num_iterations):
-            samp_idx = torch.randperm(xyz_full.shape[1])[0:5000]
-            xyz = xyz_full[ :,samp_idx ].cuda()
-            gt_pt = gt_pt_full[ :,samp_idx ].cuda()
             pc = full_pc[:,torch.randperm(full_pc.shape[1])[0:5000]].cuda()
-
-            shape_vecs = model.encoder(pc, xyz)
-            decoder_input = torch.cat([shape_vecs, xyz], dim=-1)
-            pred_sdf = model.decoder(decoder_input).unsqueeze(-1)
-
             pc_vecs = model.encoder(pc, pc)
             pc_pred = model.decoder(torch.cat([pc_vecs, pc], dim=-1))
-
-            pred_pt, gt_pt = model.get_unlab_offset(xyz, gt_pt, pred_sdf)
-
-            # loss of pt offset and loss of L1
-            unlabeled_loss = nn.MSELoss()(pred_pt, gt_pt)
-            # using pc to supervise query as well
-            pc_l1 = nn.L1Loss()(pc_pred, torch.zeros_like(pc_pred))
-
-            loss = unlabeled_loss + 0.01*pc_l1
-
+            
+            loss = nn.L1Loss()(pc_pred, torch.zeros_like(pc_pred))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
