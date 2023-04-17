@@ -22,7 +22,7 @@ from utils import utils
 
 
 
-def visualization(color, depth, pc, pc2):
+def visualization(pc, pc2, color, depth):
 
     # visualization for your debugging
     import matplotlib.pyplot as plt
@@ -30,12 +30,14 @@ def visualization(color, depth, pc, pc2):
         
     # show RGB image
     ax = fig.add_subplot(1, 3, 1)
-    plt.imshow(color[:, :, (2, 1, 0)])
+    if color is not None:
+        plt.imshow(color[:, :, (2, 1, 0)])
     ax.set_title('RGB image')
         
     # show depth image
     ax = fig.add_subplot(1, 3, 2)
-    plt.imshow(depth)
+    if depth is not None:
+        plt.imshow(depth)
     ax.set_title('depth image')
         
     # up to now, suppose you get the points box as pbox. Its shape should be (5280, 3)
@@ -43,7 +45,7 @@ def visualization(color, depth, pc, pc2):
     # You shall see the figure in the homework assignment
     ax = fig.add_subplot(1, 3, 3, projection='3d')
     ax.scatter(pc[:, 0], pc[:, 1], pc[:, 2], marker='.', color='r')
-    ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], marker='.', color='g')
+    # ax.scatter(pc2[:, 0], pc2[:, 1], pc2[:, 2], marker='.', color='g')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -53,46 +55,63 @@ def visualization(color, depth, pc, pc2):
 
 
 def main():
-
-    # set up renderer
-    renderer = OnlineObjectRenderer(caching=True)
-    all_poses = utils.uniform_quaternions()
-    
-    cad_path = args.file.replace('sdf_data.csv', 'model.obj')
-    cad_scale = 1.0
-    
-    viewing_index = np.random.randint(0, high=len(all_poses))
-    camera_pose = all_poses[viewing_index]
-    
-    # read centroid
-    filename = args.file.replace('sdf_data', 'centroid')
-    centroid = pd.read_csv(filename, sep=',',header=None).values
-    
-    color, depth, pc, transferred_pose = renderer.change_and_render(cad_path, cad_scale, centroid, camera_pose)
-    pc = pc.dot(utils.inverse_transform(transferred_pose).T)[:, :3]
     
     # set up model
     model = init_model(specs["Model"], specs, 1)
-    
     ckpt = "{}.ckpt".format(args.resume) if args.resume=='last' else "epoch={}.ckpt".format(args.resume)
+    print('checkpoint', ckpt)
     resume = os.path.join(args.exp_dir, ckpt)
-     
     checkpoint = torch.load(resume, map_location=lambda storage, loc: storage)
 
+    # read data
     file_ext = args.file[-4:]
     if file_ext == ".csv":
         f = pd.read_csv(args.file, sep=',',header=None).values
         # only use points on the object surface
         f = f[f[:,-1]==0][:,:3]
+        
+        # set up renderer
+        renderer = OnlineObjectRenderer(caching=True)
+        all_poses = utils.uniform_quaternions()
+    
+        cad_path = args.file.replace('sdf_data.csv', 'model.obj')
+        cad_scale = 1.0
+    
+        viewing_index = np.random.randint(0, high=len(all_poses))
+        camera_pose = all_poses[viewing_index]
+    
+        # read centroid
+        filename = args.file.replace('sdf_data', 'centroid')
+        centroid = pd.read_csv(filename, sep=',',header=None).values
+    
+        color, depth, pc, transferred_pose = renderer.change_and_render(cad_path, cad_scale, centroid, camera_pose)
+        pc = pc.dot(utils.inverse_transform(transferred_pose).T)[:, :3]        
+        
     elif file_ext == ".ply":
-        f = trimesh.load(args.file).vertices
+        vertices = trimesh.load(args.file).vertices
+        print(vertices.shape)
+        
+        # normalization
+        # lbs = np.min(vertices, 0)
+        # ubs = np.max(vertices, 0)
+        # bbd = np.linalg.norm(ubs - lbs)
+        # vertices = vertices / bbd
+        
+        pc = vertices.copy()
+        # npoints = 1000
+        # pc = utils.regularize_pc_point_count(pc, npoints, use_farthest_point=True)
+        
+        f = pc.copy()
+        color = None
+        depth = None
+        
     else:
         print("add your extension type here! currently not supported...")
         exit()
 
     # visualization
     print(pc.shape, f.shape)
-    visualization(color, depth, pc[::5], f[::20])
+    visualization(pc[::5], f[::20], color, depth)
     
     # assign poinsts
     f = pc.copy()

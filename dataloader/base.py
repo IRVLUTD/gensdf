@@ -99,6 +99,10 @@ class Dataset(torch.utils.data.Dataset):
             color, depth, pc, transferred_pose = self.renderer.render(camera_pose)
             pc = pc.dot(utils.inverse_transform(transferred_pose).T)[:, :3]
             
+            # add noise
+            # variance = 0.005
+            # pc += np.random.normal(0, np.sqrt(variance), pc.shape)
+            
             if pc.shape[0] > 200:
                 break
             else:
