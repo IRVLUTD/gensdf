@@ -3,6 +3,7 @@
 *.ckpt
 *.csv
 *log*
+*.zip
 */.DS_Store
 
 # Byte-compiled / optimized / DLL files
