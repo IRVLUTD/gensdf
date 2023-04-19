@@ -94,6 +94,7 @@ def main():
 
     # read data
     file_ext = args.file[-4:]
+    pc_size = 5000    
     if file_ext == ".csv":
         f = pd.read_csv(args.file, sep=',',header=None).values
         # only use points on the object surface
@@ -114,7 +115,13 @@ def main():
         centroid = pd.read_csv(filename, sep=',',header=None).values
     
         color, depth, pc, transferred_pose = renderer.change_and_render(cad_path, cad_scale, centroid, camera_pose)
-        pc = pc.dot(utils.inverse_transform(transferred_pose).T)[:, :3]        
+        pc = pc.dot(utils.inverse_transform(transferred_pose).T)[:, :3]
+        
+        if pc.shape[0] < pc_size:
+            pc_idx = np.random.choice(pc.shape[0], pc_size)
+        else:
+            pc_idx = np.random.choice(pc.shape[0], pc_size, replace=False)
+        pc = pc[pc_idx]
         
     elif file_ext == ".ply":
         vertices = trimesh.load(args.file).vertices
@@ -127,8 +134,7 @@ def main():
         # vertices = vertices / bbd
         
         pc = vertices.copy()
-        # npoints = 1000
-        # pc = utils.regularize_pc_point_count(pc, npoints, use_farthest_point=True)
+        pc = utils.regularize_pc_point_count(pc, pc_size, use_farthest_point=True)
         
         f = pc.copy()
         color = None
